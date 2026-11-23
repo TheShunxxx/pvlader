@@ -80,6 +80,7 @@ class ControllerState:
     enabled: bool | None = None  # zuletzt kommandierter Freigabezustand (None = unbekannt)
     soc_limit_reached: bool = False
     plan_charging: bool = False  # Planladen läuft (verriegelt bis Ziel/Zielzeit)
+    mode: str | None = None  # zuletzt gesehener Modus – Moduswechsel hebt die Schaltsperre auf
 
 
 @dataclass
@@ -111,7 +112,9 @@ class _Decision:
     phases: int | None = None  # None = beibehalten
     power_w: float | None = None  # Strom aus Leistung berechnen
     current: float | None = None  # fester Strom
-    exempt: bool = False  # Abschalten ohne Guard
+    # Ausdrücklicher Wunsch (Aus, Sofort/Plan, SoC-Limit, kein Fahrzeug): schaltet ohne Guard.
+    # Der Guard bremst nur die automatische PV-Regelung (Start/Stopp/Phasen).
+    exempt: bool = False
 
 
 def _secs(now: datetime, since: datetime | None) -> float:
@@ -236,6 +239,11 @@ def step(inp: ControllerInputs, state: ControllerState) -> tuple[Command, Contro
     if st.phases is None and measured_on and inp.active_phases > 0:
         st.phases = 1 if inp.active_phases == 1 else 3
 
+    # Moduswechsel durch den Nutzer: frühere Schaltvorgänge sperren nichts mehr
+    if st.mode is not None and st.mode != inp.mode:
+        st.last_switch = None
+    st.mode = inp.mode
+
     planned_start: datetime | None = None
     effective_mode = inp.mode
     vehicle = _has_vehicle(inp)
@@ -268,7 +276,7 @@ def step(inp: ControllerInputs, state: ControllerState) -> tuple[Command, Contro
             reason = "Sofortladen"
             if st.plan_charging and inp.plan_time is not None:
                 reason = f"Planladen bis {inp.plan_time:%H:%M} auf {inp.plan_target_soc:.0f} %"
-            dec = _Decision(True, reason, 3, current=inp.max_current)
+            dec = _Decision(True, reason, 3, current=inp.max_current, exempt=True)
         elif effective_mode in (MODE_PV, MODE_MINPV):
             # Zählerausfall: wie Überschuss 0 behandeln (Minimum, verzögerter Stopp, Guard gilt)
             eff = surplus if surplus is not None else 0.0
@@ -288,7 +296,7 @@ def step(inp: ControllerInputs, state: ControllerState) -> tuple[Command, Contro
     switched = False
 
     if dec.enable and dec.phases is not None and dec.phases != st.phases:
-        if guard_ok:
+        if guard_ok or dec.exempt:
             cmd.phases = st.phases = dec.phases
             st.phase_up_timer = st.phase_down_timer = st.disable_timer = None
             switched = True
@@ -296,7 +304,7 @@ def step(inp: ControllerInputs, state: ControllerState) -> tuple[Command, Contro
             blocked = True
 
     if dec.enable != st.enabled:
-        if guard_ok or (dec.exempt and not dec.enable):
+        if guard_ok or dec.exempt:
             cmd.enable = st.enabled = dec.enable
             st.enable_timer = st.disable_timer = None
             switched = True

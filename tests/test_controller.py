@@ -297,6 +297,39 @@ def test_guard_also_blocks_phase_switch():
     assert next(h[4] for h in sim.history if h[0] == 360) == 3
 
 
+def test_now_ignores_guard_after_pv_stop():
+    # PV hat gerade abgeschaltet (Guard läuft) -> Sofortladen startet trotzdem sofort
+    sim = Sim(pv=lambda t: 0 if t >= 70 else 3000)
+    sim.run_until(400)
+    assert not sim.enabled and sim.state.last_switch is not None
+    sim.mode = "now"
+    cmd, info = sim.tick()
+    assert cmd == Command(enable=True, current=16.0, phases=3)
+    assert "Schaltsperre" not in info.reason
+
+
+def test_mode_change_lifts_guard_for_pv_start():
+    # Aus -> Sofort -> Aus -> PV: der PV-Start wartet nur die Startverzögerung ab
+    sim = Sim(mode="now")
+    sim.tick()
+    sim.mode = "off"
+    sim.tick()
+    sim.mode = "pv"
+    sim.pv = 3000
+    sim.run(70)
+    assert sim.enabled
+    assert all("Schaltsperre" not in h[2].reason for h in sim.history)
+
+
+def test_plan_start_ignores_guard():
+    st = ControllerState(enabled=False, phases=1, mode="pv", last_switch=T0 - timedelta(seconds=10))
+    cmd, _, info = step(
+        inputs(soc=50.0, plan_active=True, plan_target_soc=80.0, plan_time=T0 + timedelta(hours=1)), st
+    )
+    assert cmd.enable is True and cmd.phases == 3
+    assert info.plan_charging
+
+
 # --- SoC-Limit ------------------------------------------------------------------
 
 
