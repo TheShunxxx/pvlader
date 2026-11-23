@@ -1,0 +1,163 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Dadapower wallbox",
+        "description": "Modbus TCP connection to the wallbox. The connection test is read-only and does not write to the wallbox.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "unit_id": "Modbus unit ID"
+        },
+        "data_description": {
+          "host": "IP address or host name of the wallbox.",
+          "unit_id": "Usually 1."
+        }
+      },
+      "entities": {
+        "title": "Measurement sources",
+        "description": "Wallbox found (serial {serial}, firmware {firmware}). Select the Home Assistant entities used for control.",
+        "data": {
+          "grid_power": "Grid power",
+          "pv_power": "PV power",
+          "soc": "Vehicle state of charge",
+          "plugged": "Vehicle plugged in"
+        },
+        "data_description": {
+          "grid_power": "Signed grid power in W: positive = import, negative = export.",
+          "pv_power": "Optional, display only.",
+          "soc": "Battery level of the vehicle in %.",
+          "plugged": "Optional, used only if the wallbox reports an unknown plug state."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the wallbox.",
+      "no_serial": "The wallbox did not report a serial number.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This wallbox is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "PV charger options",
+        "data": {
+          "grid_power": "Grid power",
+          "pv_power": "PV power",
+          "soc": "Vehicle state of charge",
+          "plugged": "Vehicle plugged in",
+          "battery_kwh": "Battery capacity",
+          "grid_price": "Grid price",
+          "feedin_price": "Feed-in tariff",
+          "min_current": "Minimum current (installation)",
+          "max_current": "Maximum current (installation)",
+          "enable_delay": "Enable delay",
+          "disable_delay": "Disable delay",
+          "guard": "Switching guard time"
+        },
+        "data_description": {
+          "min_current": "Lower bound for the minimum current setting.",
+          "max_current": "Upper bound for the maximum current setting (fuse protection).",
+          "enable_delay": "PV mode: surplus must be sufficient this long before charging starts.",
+          "disable_delay": "PV mode: surplus must be insufficient this long before charging stops.",
+          "guard": "Minimum time between enable or phase switching."
+        }
+      }
+    },
+    "error": {
+      "min_gt_max": "Minimum current must not exceed maximum current."
+    }
+  },
+  "entity": {
+    "select": {
+      "mode": {
+        "name": "Charge mode",
+        "state": {
+          "off": "Off",
+          "now": "Fast",
+          "pv": "PV only",
+          "minpv": "Min+PV"
+        }
+      }
+    },
+    "switch": {
+      "control_enabled": { "name": "Control active" },
+      "plan_active": { "name": "Charge plan active" }
+    },
+    "number": {
+      "limit_soc": { "name": "Charge limit" },
+      "plan_target_soc": { "name": "Plan target SoC" },
+      "min_current": { "name": "Minimum current" },
+      "max_current": { "name": "Maximum current" }
+    },
+    "datetime": {
+      "plan_time": { "name": "Plan target time" }
+    },
+    "sensor": {
+      "charge_power": { "name": "Charging power" },
+      "charge_current": { "name": "Charging current" },
+      "phases_active": { "name": "Active phases" },
+      "plug_status": {
+        "name": "Plug status",
+        "state": {
+          "a": "No vehicle",
+          "b": "Connected",
+          "c": "Charging"
+        }
+      },
+      "control_reason": {
+        "name": "Control status",
+        "state_attributes": {
+          "planned_command": { "name": "Planned command" },
+          "target_enabled": { "name": "Target enabled" },
+          "target_phases": { "name": "Target phases" },
+          "target_current": { "name": "Target current" },
+          "control_enabled": { "name": "Control active" },
+          "effective_mode": { "name": "Effective mode" },
+          "guard_remaining_s": { "name": "Guard remaining" },
+          "soc_limit_reached": { "name": "SoC limit reached" }
+        }
+      },
+      "surplus": { "name": "PV surplus" },
+      "session_energy": { "name": "Session energy" },
+      "session_solar_percent": { "name": "Session solar share" },
+      "session_cost": { "name": "Session cost" },
+      "remaining_time": { "name": "Remaining charge time" },
+      "planned_start": { "name": "Planned start" },
+      "total_energy": { "name": "Total energy" },
+      "stats_total_kwh": { "name": "Statistics energy" },
+      "stats_solar_percent": { "name": "Statistics solar share" },
+      "stats_total_cost": { "name": "Statistics cost" },
+      "stats_count": { "name": "Statistics sessions" },
+      "voltage_l1": { "name": "Voltage L1" },
+      "voltage_l2": { "name": "Voltage L2" },
+      "voltage_l3": { "name": "Voltage L3" },
+      "current_l1": { "name": "Current L1" },
+      "current_l2": { "name": "Current L2" },
+      "current_l3": { "name": "Current L3" }
+    },
+    "binary_sensor": {
+      "connected": { "name": "Vehicle connected" },
+      "charging": { "name": "Charging" },
+      "plan_charging": { "name": "Plan charging" }
+    }
+  },
+  "exceptions": {
+    "no_entry": { "message": "No loaded PV charger entry found." },
+    "ambiguous_entry": { "message": "Several PV charger entries are loaded; specify config_entry_id." }
+  },
+  "services": {
+    "set_plan": {
+      "name": "Set charge plan",
+      "description": "Sets target SoC and target time and activates the charge plan.",
+      "fields": {
+        "target_soc": { "name": "Target SoC", "description": "State of charge to reach by the target time." },
+        "time": { "name": "Target time", "description": "Local date and time by which the target SoC should be reached." },
+        "config_entry_id": { "name": "Wallbox", "description": "Only required if several wallboxes are configured." }
+      }
+    }
+  }
+}

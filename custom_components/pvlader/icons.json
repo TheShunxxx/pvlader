@@ -1,0 +1,48 @@
+{
+  "entity": {
+    "select": {
+      "mode": {
+        "default": "mdi:ev-station",
+        "state": {
+          "off": "mdi:power-plug-off",
+          "now": "mdi:lightning-bolt",
+          "pv": "mdi:solar-power",
+          "minpv": "mdi:solar-power-variant"
+        }
+      }
+    },
+    "switch": {
+      "control_enabled": {
+        "default": "mdi:shield-check",
+        "state": { "off": "mdi:shield-off-outline" }
+      },
+      "plan_active": { "default": "mdi:calendar-clock" }
+    },
+    "number": {
+      "limit_soc": { "default": "mdi:battery-charging-80" },
+      "plan_target_soc": { "default": "mdi:battery-clock" },
+      "min_current": { "default": "mdi:current-ac" },
+      "max_current": { "default": "mdi:current-ac" }
+    },
+    "datetime": {
+      "plan_time": { "default": "mdi:clock-end" }
+    },
+    "sensor": {
+      "phases_active": { "default": "mdi:sine-wave" },
+      "plug_status": { "default": "mdi:ev-plug-type2" },
+      "control_reason": { "default": "mdi:information-outline" },
+      "surplus": { "default": "mdi:solar-power" },
+      "session_solar_percent": { "default": "mdi:white-balance-sunny" },
+      "remaining_time": { "default": "mdi:timer-sand" },
+      "planned_start": { "default": "mdi:calendar-start" },
+      "stats_solar_percent": { "default": "mdi:white-balance-sunny" },
+      "stats_count": { "default": "mdi:counter" }
+    },
+    "binary_sensor": {
+      "plan_charging": { "default": "mdi:calendar-check" }
+    }
+  },
+  "services": {
+    "set_plan": { "service": "mdi:calendar-clock" }
+  }
+}

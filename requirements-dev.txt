@@ -1,0 +1,5 @@
+pymodbus>=3.6
+pytest>=8
+pytest-asyncio>=0.23
+# HA-Testumgebung; mit Python 3.12 ist 0.13.205 (= homeassistant 2025.1.4) die letzte Version
+pytest-homeassistant-custom-component

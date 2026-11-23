@@ -1,0 +1,12 @@
+# Privates Wissen und Rohquellen bleiben lokal (enthalten Geheimnisse/Hausdaten)
+raw/
+wiki/
+CLAUDE.md
+.claude/
+
+# Python / Tools
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/

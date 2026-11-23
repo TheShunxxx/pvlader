@@ -1,0 +1,21 @@
+set_plan:
+  fields:
+    target_soc:
+      required: true
+      example: 80
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+    time:
+      required: true
+      example: "2026-11-24 07:00:00"
+      selector:
+        datetime:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: pvlader
