@@ -280,6 +280,7 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
             charging=wb.charging,
             active_phases=wb.phases_active,
             configured_phases=wb.phases_raw,
+            current_setpoint=None if wb.current_setpoint_raw is None else float(wb.current_setpoint_raw),
             enabled=wb.enabled,
             soc=soc,
             limit_soc=s.limit_soc,

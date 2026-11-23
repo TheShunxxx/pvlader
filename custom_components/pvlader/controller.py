@@ -58,6 +58,9 @@ class ControllerInputs:
     enabled: bool  # Register 1000 – nur für Initialisierung/Resync
     soc: float | None = None
     configured_phases: int | None = None  # Register 1002 per FC04 (live bestätigt 2026-11-23)
+    # Register 1001 per FC04 in ganzen A. Die Box setzt es beim Abschalten selbst auf 6 A zurück
+    # (live beobachtet 2026-11-23) -> Grundlage für den Strom-Resync.
+    current_setpoint: float | None = None
     limit_soc: float = 100.0
     min_current: float = MIN_CURRENT
     max_current: float = MAX_CURRENT
@@ -319,6 +322,9 @@ def step(inp: ControllerInputs, state: ControllerState) -> tuple[Command, Contro
         st.last_switch = now
         guard_left = s.guard
 
+    if cmd.enable is False:
+        st.current = None  # Box fällt beim Abschalten selbst auf 6 A zurück
+
     # Strom nur bei (künftig) freigegebener Box
     if st.enabled and (dec.current is not None or dec.power_w is not None):
         phases = st.phases or 1
@@ -329,10 +335,20 @@ def step(inp: ControllerInputs, state: ControllerState) -> tuple[Command, Contro
         target = round(min(inp.max_current, max(inp.min_current, target)), 2)
         diff = abs(target - st.current) if st.current is not None else None
         at_bound = target in (inp.min_current, inp.max_current)
+        # Box meldet einen anderen Sollstrom als zuletzt geschrieben (z. B. nach eigenem Reset)
+        drifted = (
+            inp.enabled
+            and inp.current_setpoint is not None
+            and st.current is not None
+            and abs(inp.current_setpoint - st.current) >= 1
+        )
         if (
             diff is None
+            or drifted
+            or cmd.enable is True
+            or cmd.phases is not None
             or diff >= s.current_threshold
-            or (diff >= 0.01 and (at_bound or cmd.enable is True or cmd.phases is not None))
+            or (diff >= 0.01 and at_bound)
         ):
             cmd.current = st.current = target
 

@@ -60,6 +60,7 @@ class Sim:
             charging=p > 0,
             active_phases=self.phases if p > 0 else 0,
             enabled=self.enabled,
+            current_setpoint=float(int(self.current)),
             soc=self.soc,
             limit_soc=self.limit_soc,
             plan_active=self.plan_active,
@@ -75,6 +76,8 @@ class Sim:
             self.current = cmd.current
         if cmd.enable is not None:
             self.enabled = cmd.enable
+            if not cmd.enable:
+                self.current = 6.0  # echte Box: 1001 fällt beim Abschalten auf 6 A
         # SoC fortschreiben
         if self.soc is not None and p > 0:
             self.soc = min(100.0, self.soc + p * 10 / 3600 / 1000 * self.efficiency / self.battery_kwh * 100)
@@ -132,6 +135,36 @@ def test_mode_now_full_power_three_phases():
     assert cmd == Command(enable=True, current=16.0, phases=3)
     assert info.effective_mode == "now"
     cmd, _ = sim.tick()
+    assert cmd.empty
+
+
+def test_now_after_off_rewrites_current():
+    # Box fällt beim Abschalten auf 6 A -> beim erneuten Sofortladen 16 A neu schreiben
+    sim = Sim(mode="now")
+    sim.tick()
+    sim.mode = "off"
+    sim.tick()
+    assert sim.current == 6.0
+    sim.mode = "now"
+    cmd, _ = sim.tick()
+    assert cmd.enable is True and cmd.current == 16.0
+    assert sim.current == 16.0
+
+
+def test_current_resync_when_box_reports_other_setpoint():
+    st = ControllerState(enabled=True, phases=3, current=16.0, mode="now")
+    cmd, st, _ = step(
+        inputs(mode="now", charge_power_w=4200, charging=True, active_phases=3, enabled=True,
+               configured_phases=3, current_setpoint=6.0),
+        st,
+    )
+    assert cmd == Command(current=16.0)
+    # Box meldet 16 A -> nichts schreiben
+    cmd, st, _ = step(
+        inputs(mode="now", charge_power_w=11000, charging=True, active_phases=3, enabled=True,
+               configured_phases=3, current_setpoint=16.0),
+        st,
+    )
     assert cmd.empty
 
 
