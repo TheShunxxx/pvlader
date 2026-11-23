@@ -403,6 +403,13 @@ def test_initial_state_adopted_from_measurement():
     assert cmd.enable is None and cmd.phases is None
 
 
+def test_initial_phases_from_register_without_charging():
+    # Box steht laut Register 1002 auf 1 Phase, lädt aber nicht – kein unnötiger Phasen-Write
+    inp = inputs(mode="pv", grid_power_w=0.0, configured_phases=1)
+    cmd, st, _ = step(inp, ControllerState())
+    assert st.phases == 1 and cmd.phases is None
+
+
 # --- Plan -----------------------------------------------------------------------
 
 

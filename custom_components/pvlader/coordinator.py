@@ -279,6 +279,7 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
             connected=connected,
             charging=wb.charging,
             active_phases=wb.phases_active,
+            configured_phases=wb.phases_raw,
             enabled=wb.enabled,
             soc=soc,
             limit_soc=s.limit_soc,

@@ -57,6 +57,7 @@ class ControllerInputs:
     active_phases: int  # gemessen (0 wenn kein Strom fließt)
     enabled: bool  # Register 1000 – nur für Initialisierung/Resync
     soc: float | None = None
+    configured_phases: int | None = None  # Register 1002 per FC04 (live bestätigt 2026-11-23)
     limit_soc: float = 100.0
     min_current: float = MIN_CURRENT
     max_current: float = MAX_CURRENT
@@ -230,6 +231,8 @@ def step(inp: ControllerInputs, state: ControllerState) -> tuple[Command, Contro
     # Unbekannten Zustand (z. B. nach Neustart) aus Messwerten übernehmen
     if st.enabled is None:
         st.enabled = measured_on or inp.enabled
+    if st.phases is None and inp.configured_phases in (1, 3):
+        st.phases = inp.configured_phases
     if st.phases is None and measured_on and inp.active_phases > 0:
         st.phases = 1 if inp.active_phases == 1 else 3
 
