@@ -42,14 +42,17 @@ from .ha_const import (
     CONF_GUARD,
     CONF_MAX_CURRENT,
     CONF_MIN_CURRENT,
+    CONF_ODOMETER,
     CONF_PLUGGED,
     CONF_PV_POWER,
+    CONF_RANGE,
     CONF_SOC,
+    ENTITY_FALLBACKS,
     OPTION_DEFAULTS,
     SAVE_DELAY,
     STORAGE_VERSION,
 )
-from .session import ChargingSession, SessionTracker
+from .session import COST_VERSION, ChargingSession, SessionTracker
 
 type PvLaderConfigEntry = ConfigEntry[PvLaderCoordinator]
 
@@ -124,13 +127,19 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
         )
         self.client = client
         self.wallbox_info = info
-        self.conf: dict[str, Any] = {**OPTION_DEFAULTS, **entry.data, **entry.options}
+        self.conf: dict[str, Any] = {**OPTION_DEFAULTS, **ENTITY_FALLBACKS, **entry.data, **entry.options}
         self.settings = UserSettings()
-        self.tracker = SessionTracker(grid_price=float(self.conf[CONF_GRID_PRICE]))
+        self.tracker = SessionTracker(
+            grid_price=float(self.conf[CONF_GRID_PRICE]), feedin_price=float(self.conf[CONF_FEEDIN_PRICE])
+        )
         self._ctrl_state = ControllerState()
         # Ladeleistung der letzten ~60 s, um sie zeitlich zum Netzzähler passend zu wählen
         self._power_samples: deque[tuple[datetime, float]] = deque(maxlen=7)
         self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}")
+        # Ladehistorie in eigener Datei: groß, ändert sich nur beim Session-Ende
+        self._history_store: Store[dict[str, Any]] = Store(
+            hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}.history"
+        )
         self._save_pending = False
         self._loaded = False
         self._cycle_lock = asyncio.Lock()
@@ -140,8 +149,24 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
     async def async_load(self) -> None:
         """Gespeicherte Einstellungen + Sessions laden, Schreibmodus setzen, Heartbeat starten."""
         stored = await self._store.async_load() or {}
+        history = await self._history_store.async_load()
         self.settings = UserSettings.from_dict(stored.get("settings"))
-        self.tracker = SessionTracker.from_dict(stored.get("sessions"), grid_price=float(self.conf[CONF_GRID_PRICE]))
+        sessions = dict(stored.get("sessions") or {})
+        if history is not None:
+            sessions["history"] = history.get("sessions", [])
+            sessions["history_cost_version"] = history.get("cost_version", 1)
+        history_outdated = history is None or int(history.get("cost_version", 1)) < COST_VERSION
+        main_outdated = int(sessions.get("cost_version", 1)) < COST_VERSION
+        self.tracker = SessionTracker.from_dict(
+            sessions,
+            grid_price=float(self.conf[CONF_GRID_PRICE]),
+            feedin_price=float(self.conf[CONF_FEEDIN_PRICE]),
+        )
+        # Migration: Historie lag bisher im Haupt-Store bzw. Kosten nach alter Rechnung
+        if self.tracker.history and history_outdated:
+            await self.async_save_history()
+        if stored and main_outdated:
+            await self._store.async_save(self._data_to_save())
         self._loaded = True
         self.client.read_only = not self.settings.control_enabled
         if self.settings.control_enabled:
@@ -155,7 +180,12 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
     @callback
     def _data_to_save(self) -> dict[str, Any]:
         self._save_pending = False
-        return {"settings": self.settings.to_dict(), "sessions": self.tracker.to_dict()}
+        return {"settings": self.settings.to_dict(), "sessions": self.tracker.to_dict(include_history=False)}
+
+    async def async_save_history(self) -> None:
+        await self._history_store.async_save(
+            {"sessions": self.tracker.history_to_list(), "cost_version": COST_VERSION}
+        )
 
     @callback
     def _schedule_save(self) -> None:
@@ -318,8 +348,18 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
 
         # Session: endet beim Abstecken bzw. bei Modus Aus unter eigener Steuerung
         active = connected and not (s.control_enabled and s.mode == MODE_OFF)
-        finished = self.tracker.update(now, active, wb.power_w, grid, wb.session_wh)
+        finished = self.tracker.update(
+            now,
+            active,
+            wb.power_w,
+            grid,
+            wb.session_wh,
+            soc=soc,
+            odometer=self._float(CONF_ODOMETER),
+            range_km=self._float(CONF_RANGE),
+        )
         if finished is not None:
+            await self.async_save_history()
             await self.async_save_now()
         else:
             self._schedule_save()

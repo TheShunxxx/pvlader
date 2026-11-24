@@ -31,15 +31,20 @@ from .ha_const import (
     CONF_GUARD,
     CONF_MAX_CURRENT,
     CONF_MIN_CURRENT,
+    CONF_ODOMETER,
     CONF_PLUGGED,
     CONF_PV_POWER,
+    CONF_RANGE,
     CONF_SOC,
     CONF_UNIT_ID,
     DEFAULT_GRID_POWER,
     DEFAULT_HOST,
+    DEFAULT_ODOMETER,
     DEFAULT_PLUGGED,
     DEFAULT_PV_POWER,
+    DEFAULT_RANGE,
     DEFAULT_SOC,
+    ENTITY_FALLBACKS,
     ENTITY_KEYS,
     OPTION_DEFAULTS,
 )
@@ -51,6 +56,8 @@ ENTITY_DEFAULTS = {
     CONF_PV_POWER: DEFAULT_PV_POWER,
     CONF_SOC: DEFAULT_SOC,
     CONF_PLUGGED: DEFAULT_PLUGGED,
+    CONF_ODOMETER: DEFAULT_ODOMETER,
+    CONF_RANGE: DEFAULT_RANGE,
 }
 
 
@@ -82,6 +89,9 @@ def _entities_schema(values: dict[str, Any]) -> vol.Schema:
             vol.Optional(CONF_PLUGGED, description={"suggested_value": values.get(CONF_PLUGGED)}): EntitySelector(
                 EntitySelectorConfig(domain="binary_sensor")
             ),
+            # Nur für die Ladehistorie (Kilometerstand, Reichweite)
+            vol.Optional(CONF_ODOMETER, description={"suggested_value": values.get(CONF_ODOMETER)}): sensor,
+            vol.Optional(CONF_RANGE, description={"suggested_value": values.get(CONF_RANGE)}): sensor,
         }
     )
 
@@ -134,7 +144,12 @@ class PvLaderConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             data = {**self._data, **{k: user_input.get(k) for k in ENTITY_KEYS}}
             return self.async_create_entry(title="PV-Lader", data=data)
-        suggested = {CONF_PV_POWER: DEFAULT_PV_POWER, CONF_PLUGGED: DEFAULT_PLUGGED}
+        suggested = {
+            CONF_PV_POWER: DEFAULT_PV_POWER,
+            CONF_PLUGGED: DEFAULT_PLUGGED,
+            CONF_ODOMETER: DEFAULT_ODOMETER,
+            CONF_RANGE: DEFAULT_RANGE,
+        }
         assert self._info is not None
         return self.async_show_form(
             step_id="entities",
@@ -161,7 +176,7 @@ class PvLaderOptionsFlow(OptionsFlow):
                 data.update({k: user_input[k] for k in OPTION_DEFAULTS})
                 return self.async_create_entry(data=data)
 
-        current = {**OPTION_DEFAULTS, **self.config_entry.data, **self.config_entry.options}
+        current = {**OPTION_DEFAULTS, **ENTITY_FALLBACKS, **self.config_entry.data, **self.config_entry.options}
         if user_input is not None:
             current.update(user_input)
         schema = _entities_schema(current).extend(

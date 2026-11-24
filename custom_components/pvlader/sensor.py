@@ -59,8 +59,10 @@ def _session_attrs(c: PvLaderCoordinator) -> dict[str, Any]:
         "solar_kwh": round(sess.solar_wh / 1000, 3),
         "grid_kwh": round(sess.grid_wh / 1000, 3),
         "max_power_w": round(sess.max_power_w),
-        # Opportunitätskosten: entgangene Einspeisevergütung für den Solaranteil
-        "feedin_lost_eur": round(sess.solar_wh / 1000 * c.feedin_price, 2),
+        # Kosten wie evcc: Netz zum Strompreis + Solar zur entgangenen Einspeisevergütung
+        "grid_cost_eur": round(sess.grid_wh / 1000 * c.tracker.grid_price, 2),
+        "solar_cost_eur": round(sess.solar_wh / 1000 * c.tracker.feedin_price, 2),
+        "price_ct_kwh": round(sess.cost_eur / sess.energy_wh * 100_000, 1) if sess.energy_wh > 0 else None,
     }
 
 

@@ -38,7 +38,7 @@ GRID_PRICE: Final = 0.298
 FEEDIN_PRICE: Final = 0.082
 
 # Sessions
-SESSION_HISTORY_SIZE: Final = 50
+SESSION_HISTORY_SIZE: Final = 3000  # eigene Store-Datei, wird nur beim Session-Ende geschrieben
 MAX_INTEGRATION_DT: Final = 60.0  # s, größere Lücken werden gekappt
 
 # Wallbox Dadapower

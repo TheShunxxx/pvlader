@@ -16,6 +16,33 @@ Unabhängige Implementierung; nutzt keinen evcc-Code.
 
 pymodbus bringt Home Assistant bereits mit; es wird nichts zusätzlich installiert.
 
+## Dashboard-Karte und Seitenreiter
+
+Nach dem Neustart bringt die Integration beides selbst mit – keine HACS-Frontend-Ressource nötig:
+
+- **Seitenreiter „PV-Lader“** (Seitenleiste, `/pvlader`):
+  - *Laden*: Energiefluss (PV, Netz, Haus, Ladepunkt) mit Preisen, die Ladekarte und die letzten Ladevorgänge.
+  - *Ladungen*: Auswertung nach Monat/Jahr/Gesamt (Energie Netz/Solar oder Kosten als Balkendiagramm, Klick auf einen Balken springt eine Ebene tiefer), Kennzahlen (Solaranteil, Kosten, Ø Preis, PV-Ersparnis, Ladedauer, Reichweite) und Tabelle aller Ladevorgänge mit CSV-Export.
+- **Karte** `custom:pvlader-card` (im Karten-Auswahldialog als „PV-Lader“): Lademodus Aus/PV/Min+PV/Sofort, Ladestand mit Ladegrenze, Leistung und Regelstatus, Ladegrenze-Regler, Ladeplanung (Zielzeit + Ziel-SoC, Dauer-/Kostenschätzung), letzter bzw. laufender Ladevorgang.
+
+```yaml
+type: custom:pvlader-card
+title: Garage            # optional, Standard: Name des Eintrags
+vehicle_name: Model Y    # optional
+show_plan: true          # optional
+show_session: true       # optional
+show_link: true          # Link „Auswertung →“ zum Seitenreiter
+# entry_id: …            # nur bei mehreren Wallboxen
+```
+
+**Kosten** werden wie in evcc gerechnet: Netzstrom × Strompreis + Solarstrom × Einspeisevergütung (die entgangene Einspeisung). Ein Ladevorgang mit 95 % Sonne kostet so rund 9 ct/kWh. „PV-Ersparnis“ in der Auswertung = Solarstrom × (Strompreis − Einspeisevergütung). Ältere Daten rechnet pvlader beim ersten Start einmalig um.
+
+Der Hinweis „Nur mitlesen“ auf der Karte bedeutet: „Steuerung aktiv“ ist AUS, pvlader schreibt nichts auf die Wallbox.
+
+Die Ladehistorie liegt in `/config/.storage/pvlader.<entry_id>.history` (bis 3000 Vorgänge) und enthält je Vorgang zusätzlich Ladestand Start/Ende, Kilometerstand, Reichweite Start/Ende und die reine Ladedauer. Kilometerstand und Reichweite kommen aus den optionalen Messquellen (Standard `sensor.tesla_odometer`, `sensor.tesla_rated_battery_range_km`, änderbar unter *Konfigurieren*). Vorgänge ohne geladene Energie blendet die Auswertung aus.
+
+Vorschau ohne Home Assistant (Entwicklung): `python -m http.server 8765` im Repo, dann `http://localhost:8765/tools/frontend-preview.html` (`?dark`, `?view=card`).
+
 ## Wichtigste Entitäten
 
 | Entität | Zweck |

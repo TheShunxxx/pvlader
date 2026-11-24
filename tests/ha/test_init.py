@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from unittest.mock import MagicMock
+
+import pytest
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import ATTR_ENTITY_ID, STATE_OFF, STATE_ON
@@ -12,6 +15,8 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.pvlader.const import DOMAIN, FAILSAFE_TIMEOUT
+from custom_components.pvlader.ha_const import OPTION_DEFAULTS
+from custom_components.pvlader.websocket import ws_config, ws_sessions
 
 from .conftest import GRID, SERIAL, SOC, FakeWallbox
 
@@ -206,4 +211,90 @@ async def test_session_and_settings(
     assert stored["settings"]["plan_target_soc"] == 90
     assert hass.states.get(_eid(hass, "sensor", "stats_count")).state == "1"
 
+    await _unload(hass, config_entry)
+
+
+def _ws(hass: HomeAssistant, handler, msg: dict) -> dict:
+    """WebSocket-Handler direkt aufrufen (hass_ws_client braucht unter Windows einen SelectorEventLoop)."""
+    conn = MagicMock()
+    handler(hass, conn, {"id": 1, **msg})
+    if conn.send_result.called:
+        return {"success": True, "result": conn.send_result.call_args.args[1]}
+    assert conn.send_error.called
+    return {"success": False}
+
+
+async def test_history_store_and_websocket(
+    hass: HomeAssistant, wallbox: FakeWallbox, config_entry: MockConfigEntry, hass_storage
+) -> None:
+    # Kilometerstand/Reichweite: Eintrag ohne diese Schlüssel -> Tesla-Standardentitäten
+    hass.states.async_set("sensor.tesla_odometer", "39478.5")
+    hass.states.async_set("sensor.tesla_rated_battery_range_km", "200")
+    await _setup(hass, config_entry, grid=0, soc=40)
+    coordinator = config_entry.runtime_data
+    assert coordinator.tracker.current.soc_start == 40
+
+    hass.states.async_set(SOC, "45")
+    hass.states.async_set("sensor.tesla_rated_battery_range_km", "225")
+    await _refresh(hass, config_entry)
+
+    msg = _ws(hass, ws_config, {"type": "pvlader/config"})
+    assert msg["success"]
+    info = msg["result"]["entries"][0]
+    assert info["entry_id"] == config_entry.entry_id
+    assert info["entities"]["mode"] == _eid(hass, "select", "mode")
+    assert info["sources"]["odometer"] == "sensor.tesla_odometer"
+    assert info["grid_price"] == OPTION_DEFAULTS["grid_price"]
+
+    msg = _ws(hass, ws_sessions, {"type": "pvlader/sessions"})
+    assert msg["result"]["current"]["soc_end"] == 45
+    assert "int_wh" not in msg["result"]["current"]  # interne Zähler bleiben intern
+    assert msg["result"]["sessions"] == []
+
+    # Abstecken -> Historie in eigener Datei, nicht im Haupt-Store
+    wallbox.regs[1016] = 10
+    await _refresh(hass, config_entry)
+    history = hass_storage[f"{DOMAIN}.{config_entry.entry_id}.history"]["data"]["sessions"]
+    assert len(history) == 1
+    assert history[0]["soc_start"] == 40 and history[0]["soc_end"] == 45
+    assert history[0]["range_start_km"] == 200 and history[0]["range_end_km"] == 225
+    assert history[0]["odometer_km"] == 39478.5
+    assert "history" not in hass_storage[f"{DOMAIN}.{config_entry.entry_id}"]["data"]["sessions"]
+
+    msg = _ws(hass, ws_sessions, {"type": "pvlader/sessions", "entry_id": "unbekannt"})
+    assert not msg["success"]
+
+    await _unload(hass, config_entry)
+
+
+async def test_history_migrated_from_main_store(
+    hass: HomeAssistant, wallbox: FakeWallbox, config_entry: MockConfigEntry, hass_storage
+) -> None:
+    old = {
+        "start": "2026-11-20T10:00:00+01:00",
+        "end": "2026-11-20T12:00:00+01:00",
+        "energy_wh": 10000.0,
+        "solar_wh": 6000.0,
+        "grid_wh": 4000.0,
+        "cost_eur": 1.19,
+        "int_wh": 9000.0,
+        "int_solar_wh": 5400.0,
+    }
+    hass_storage[f"{DOMAIN}.{config_entry.entry_id}"] = {
+        "version": 1,
+        "key": f"{DOMAIN}.{config_entry.entry_id}",
+        "data": {"settings": {}, "sessions": {"history": [old], "count": 1, "total_kwh": 10.0}},
+    }
+    await _setup(hass, config_entry)
+    coordinator = config_entry.runtime_data
+    assert len(coordinator.tracker.history) == 1
+    migrated = hass_storage[f"{DOMAIN}.{config_entry.entry_id}.history"]["data"]["sessions"]
+    assert migrated[0]["energy_wh"] == 10000.0
+    assert "int_wh" not in migrated[0]
+    assert coordinator.tracker.history[0].solar_share == 0.6
+    # Kosten auf evcc-Rechnung umgestellt (Solar zur Einspeisevergütung), Versionsstand gespeichert
+    grid_p, feedin_p = OPTION_DEFAULTS["grid_price"], OPTION_DEFAULTS["feedin_price"]
+    assert migrated[0]["cost_eur"] == pytest.approx(4 * grid_p + 6 * feedin_p)
+    assert hass_storage[f"{DOMAIN}.{config_entry.entry_id}.history"]["data"]["cost_version"] == 2
+    assert hass_storage[f"{DOMAIN}.{config_entry.entry_id}"]["data"]["sessions"]["cost_version"] == 2
     await _unload(hass, config_entry)

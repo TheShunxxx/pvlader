@@ -21,13 +21,17 @@
           "grid_power": "Netzleistung",
           "pv_power": "PV-Leistung",
           "soc": "Ladestand Fahrzeug",
-          "plugged": "Fahrzeug eingesteckt"
+          "plugged": "Fahrzeug eingesteckt",
+          "odometer": "Kilometerstand",
+          "range": "Reichweite"
         },
         "data_description": {
           "grid_power": "Vorzeichenbehaftete Netzleistung in W: positiv = Bezug, negativ = Einspeisung.",
           "pv_power": "Optional, nur zur Anzeige.",
           "soc": "Akkustand des Fahrzeugs in %.",
-          "plugged": "Optional, wird nur genutzt, wenn die Wallbox einen unbekannten Steckerstatus meldet."
+          "plugged": "Optional, wird nur genutzt, wenn die Wallbox einen unbekannten Steckerstatus meldet.",
+          "odometer": "Optional, nur für die Ladehistorie (km).",
+          "range": "Optional, nur für die Ladehistorie (km)."
         }
       }
     },
@@ -56,14 +60,18 @@
           "max_current": "Maximalstrom (Installation)",
           "enable_delay": "Aktivierungsverzögerung",
           "disable_delay": "Deaktivierungsverzögerung",
-          "guard": "Schaltsperre"
+          "guard": "Schaltsperre",
+          "odometer": "Kilometerstand",
+          "range": "Reichweite"
         },
         "data_description": {
           "min_current": "Untergrenze für die Einstellung Mindeststrom.",
           "max_current": "Obergrenze für die Einstellung Maximalstrom (Absicherung).",
           "enable_delay": "Modus Nur PV: so lange muss genug Überschuss da sein, bevor das Laden startet.",
           "disable_delay": "Modus Nur PV: so lange muss der Überschuss fehlen, bevor das Laden stoppt.",
-          "guard": "Mindestabstand zwischen Ein-/Ausschalten bzw. Phasenumschaltung."
+          "guard": "Mindestabstand zwischen Ein-/Ausschalten bzw. Phasenumschaltung.",
+          "odometer": "Optional, nur für die Ladehistorie (km).",
+          "range": "Optional, nur für die Ladehistorie (km)."
         }
       }
     },
@@ -84,22 +92,42 @@
       }
     },
     "switch": {
-      "control_enabled": { "name": "Steuerung aktiv" },
-      "plan_active": { "name": "Ladeplan aktiv" }
+      "control_enabled": {
+        "name": "Steuerung aktiv"
+      },
+      "plan_active": {
+        "name": "Ladeplan aktiv"
+      }
     },
     "number": {
-      "limit_soc": { "name": "Ladegrenze" },
-      "plan_target_soc": { "name": "Plan-Ziel-SoC" },
-      "min_current": { "name": "Mindeststrom" },
-      "max_current": { "name": "Maximalstrom" }
+      "limit_soc": {
+        "name": "Ladegrenze"
+      },
+      "plan_target_soc": {
+        "name": "Plan-Ziel-SoC"
+      },
+      "min_current": {
+        "name": "Mindeststrom"
+      },
+      "max_current": {
+        "name": "Maximalstrom"
+      }
     },
     "datetime": {
-      "plan_time": { "name": "Plan-Zielzeit" }
+      "plan_time": {
+        "name": "Plan-Zielzeit"
+      }
     },
     "sensor": {
-      "charge_power": { "name": "Ladeleistung" },
-      "charge_current": { "name": "Ladestrom" },
-      "phases_active": { "name": "Aktive Phasen" },
+      "charge_power": {
+        "name": "Ladeleistung"
+      },
+      "charge_current": {
+        "name": "Ladestrom"
+      },
+      "phases_active": {
+        "name": "Aktive Phasen"
+      },
       "plug_status": {
         "name": "Steckerstatus",
         "state": {
@@ -111,52 +139,121 @@
       "control_reason": {
         "name": "Regelstatus",
         "state_attributes": {
-          "planned_command": { "name": "Geplantes Kommando" },
-          "target_enabled": { "name": "Soll Freigabe" },
-          "target_phases": { "name": "Soll Phasen" },
-          "target_current": { "name": "Soll Strom" },
-          "control_enabled": { "name": "Steuerung aktiv" },
-          "effective_mode": { "name": "Wirksamer Modus" },
-          "guard_remaining_s": { "name": "Schaltsperre verbleibend" },
-          "soc_limit_reached": { "name": "SoC-Limit erreicht" }
+          "planned_command": {
+            "name": "Geplantes Kommando"
+          },
+          "target_enabled": {
+            "name": "Soll Freigabe"
+          },
+          "target_phases": {
+            "name": "Soll Phasen"
+          },
+          "target_current": {
+            "name": "Soll Strom"
+          },
+          "control_enabled": {
+            "name": "Steuerung aktiv"
+          },
+          "effective_mode": {
+            "name": "Wirksamer Modus"
+          },
+          "guard_remaining_s": {
+            "name": "Schaltsperre verbleibend"
+          },
+          "soc_limit_reached": {
+            "name": "SoC-Limit erreicht"
+          }
         }
       },
-      "surplus": { "name": "PV-Überschuss" },
-      "session_energy": { "name": "Ladevorgang Energie" },
-      "session_solar_percent": { "name": "Ladevorgang Solaranteil" },
-      "session_cost": { "name": "Ladevorgang Kosten" },
-      "remaining_time": { "name": "Restladezeit" },
-      "planned_start": { "name": "Geplanter Start" },
-      "total_energy": { "name": "Zählerstand Wallbox" },
-      "stats_total_kwh": { "name": "Statistik Energie" },
-      "stats_solar_percent": { "name": "Statistik Solaranteil" },
-      "stats_total_cost": { "name": "Statistik Kosten" },
-      "stats_count": { "name": "Statistik Ladevorgänge" },
-      "voltage_l1": { "name": "Spannung L1" },
-      "voltage_l2": { "name": "Spannung L2" },
-      "voltage_l3": { "name": "Spannung L3" },
-      "current_l1": { "name": "Strom L1" },
-      "current_l2": { "name": "Strom L2" },
-      "current_l3": { "name": "Strom L3" }
+      "surplus": {
+        "name": "PV-Überschuss"
+      },
+      "session_energy": {
+        "name": "Ladevorgang Energie"
+      },
+      "session_solar_percent": {
+        "name": "Ladevorgang Solaranteil"
+      },
+      "session_cost": {
+        "name": "Ladevorgang Kosten"
+      },
+      "remaining_time": {
+        "name": "Restladezeit"
+      },
+      "planned_start": {
+        "name": "Geplanter Start"
+      },
+      "total_energy": {
+        "name": "Zählerstand Wallbox"
+      },
+      "stats_total_kwh": {
+        "name": "Statistik Energie"
+      },
+      "stats_solar_percent": {
+        "name": "Statistik Solaranteil"
+      },
+      "stats_total_cost": {
+        "name": "Statistik Kosten"
+      },
+      "stats_count": {
+        "name": "Statistik Ladevorgänge"
+      },
+      "voltage_l1": {
+        "name": "Spannung L1"
+      },
+      "voltage_l2": {
+        "name": "Spannung L2"
+      },
+      "voltage_l3": {
+        "name": "Spannung L3"
+      },
+      "current_l1": {
+        "name": "Strom L1"
+      },
+      "current_l2": {
+        "name": "Strom L2"
+      },
+      "current_l3": {
+        "name": "Strom L3"
+      }
     },
     "binary_sensor": {
-      "connected": { "name": "Fahrzeug verbunden" },
-      "charging": { "name": "Lädt" },
-      "plan_charging": { "name": "Planladen" }
+      "connected": {
+        "name": "Fahrzeug verbunden"
+      },
+      "charging": {
+        "name": "Lädt"
+      },
+      "plan_charging": {
+        "name": "Planladen"
+      }
     }
   },
   "exceptions": {
-    "no_entry": { "message": "Kein geladener PV-Lader-Eintrag gefunden." },
-    "ambiguous_entry": { "message": "Mehrere PV-Lader-Einträge geladen – bitte config_entry_id angeben." }
+    "no_entry": {
+      "message": "Kein geladener PV-Lader-Eintrag gefunden."
+    },
+    "ambiguous_entry": {
+      "message": "Mehrere PV-Lader-Einträge geladen – bitte config_entry_id angeben."
+    }
   },
   "services": {
     "set_plan": {
       "name": "Ladeplan setzen",
       "description": "Setzt Ziel-SoC und Zielzeit und aktiviert den Ladeplan.",
       "fields": {
-        "target_soc": { "name": "Ziel-SoC", "description": "Ladestand, der bis zur Zielzeit erreicht sein soll." },
-        "time": { "name": "Zielzeit", "description": "Lokales Datum und Uhrzeit, bis wann der Ziel-SoC erreicht sein soll." },
-        "config_entry_id": { "name": "Wallbox", "description": "Nur nötig, wenn mehrere Wallboxen eingerichtet sind." }
+        "target_soc": {
+          "name": "Ziel-SoC",
+          "description": "Ladestand, der bis zur Zielzeit erreicht sein soll."
+        },
+        "time": {
+          "name": "Zielzeit",
+          "description": "Lokales Datum und Uhrzeit, bis wann der Ziel-SoC erreicht sein soll."
+        },
+        "config_entry_id": {
+          "name": "Wallbox",
+          "description": "Nur nötig, wenn mehrere Wallboxen eingerichtet sind."
+        }
       }
     }
   }

@@ -1,0 +1,153 @@
+<!doctype html>
+<!--
+  Vorschau von Karte und Seitenreiter ohne Home Assistant (Entwicklungshilfe).
+  Start: python -m http.server 8765  (im Repo-Wurzelverzeichnis)
+  Aufruf: http://localhost:8765/tools/frontend-preview.html  (?dark für dunkles Thema, ?view=card)
+-->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PV-Lader Vorschau</title>
+<style>
+  :root {
+    --primary-color: #03a9f4; --text-primary-color: #fff; --primary-text-color: #212121; --secondary-text-color: #727272;
+    --primary-background-color: #fafafa; --secondary-background-color: #e5e5e5; --card-background-color: #fff;
+    --divider-color: rgba(0,0,0,.12); --app-header-background-color: #03a9f4; --warning-color: #ffa600; --error-color: #db4437;
+    font-family: Roboto, "Segoe UI", sans-serif;
+  }
+  :root.dark {
+    --primary-text-color: #e1e1e1; --secondary-text-color: #9b9b9b; --primary-background-color: #111;
+    --secondary-background-color: #282828; --card-background-color: #1c1c1c; --divider-color: rgba(225,225,225,.12);
+    --app-header-background-color: #101e24;
+  }
+  body { margin: 0; background: var(--primary-background-color); color: var(--primary-text-color); }
+  .cardonly { max-width: 440px; margin: 24px auto; padding: 0 16px; }
+</style>
+<script>
+  if (location.search.includes("dark")) document.documentElement.classList.add("dark");
+  // Minimal-Stubs der HA-Elemente
+  customElements.define("ha-card", class extends HTMLElement {
+    connectedCallback() {
+      Object.assign(this.style, { background: "var(--card-background-color)", borderRadius: "12px",
+        border: "1px solid var(--divider-color)", boxSizing: "border-box" });
+    }
+  });
+  customElements.define("ha-icon", class extends HTMLElement {
+    connectedCallback() {
+      Object.assign(this.style, { display: "inline-block", width: "var(--mdc-icon-size, 24px)", height: "var(--mdc-icon-size, 24px)",
+        borderRadius: "50%", border: "2px solid currentColor", boxSizing: "border-box", opacity: ".55", verticalAlign: "middle" });
+      this.title = this.getAttribute("icon");
+    }
+  });
+  customElements.define("ha-menu-button", class extends HTMLElement {
+    connectedCallback() { this.textContent = "☰"; this.style.fontSize = "1.3rem"; this.style.padding = "0 8px"; }
+  });
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module">
+  import "../custom_components/pvlader/www/pvlader.js";
+
+  const P = "pv_lader";
+  const ids = {
+    mode: `select.${P}_charge_mode`, limit_soc: `number.${P}_charge_limit`, plan_target_soc: `number.${P}_plan_target_soc`,
+    plan_time: `datetime.${P}_plan_target_time`, plan_active: `switch.${P}_charge_plan_active`, control_enabled: `switch.${P}_control_active`,
+    connected: `binary_sensor.${P}_connected`, charging: `binary_sensor.${P}_charging`, plan_charging: `binary_sensor.${P}_plan_charging`,
+    charge_power: `sensor.${P}_charge_power`, charge_current: `sensor.${P}_charge_current`, phases_active: `sensor.${P}_phases_active`,
+    control_reason: `sensor.${P}_control_status`, session_energy: `sensor.${P}_session_energy`, session_solar_percent: `sensor.${P}_session_solar`,
+    session_cost: `sensor.${P}_session_cost`, remaining_time: `sensor.${P}_remaining_time`, planned_start: `sensor.${P}_planned_start`,
+    stats_count: `sensor.${P}_stats_count`,
+  };
+  const now = new Date();
+  const st = (state, attributes = {}) => ({ state: String(state), attributes, last_updated: new Date().toISOString() });
+  let states = {
+    [ids.mode]: st("pv"), [ids.limit_soc]: st(80), [ids.plan_target_soc]: st(80), [ids.plan_time]: st("unknown"),
+    [ids.plan_active]: st("off"), [ids.control_enabled]: st("off"), [ids.connected]: st("on"), [ids.charging]: st("on"),
+    [ids.plan_charging]: st("off"), [ids.charge_power]: st(4140, { unit_of_measurement: "W" }), [ids.charge_current]: st(6.1),
+    [ids.phases_active]: st(3), [ids.control_reason]: st("PV-Überschuss 4,3 kW → 6 A dreiphasig"),
+    [ids.session_energy]: st(3.42, { start: new Date(now - 3600e3).toISOString(), end: null }),
+    [ids.session_solar_percent]: st(87), [ids.session_cost]: st(0.38), [ids.remaining_time]: st(96),
+    [ids.planned_start]: st("unknown"), [ids.stats_count]: st(80),
+    "sensor.grid_power": st(-350, { unit_of_measurement: "W" }), "sensor.pv_power": st(6.2, { unit_of_measurement: "kW" }),
+    "sensor.tesla_battery_level": st(42), "sensor.tesla_rated_battery_range_km": st(207),
+  };
+
+  // Historie: ~14 Monate zufällige Ladevorgänge
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const sessions = [];
+  let odo = 39479;
+  for (let d = 0; d < 420; d += 1 + Math.floor(rnd() * 4)) {
+    const start = new Date(now - (d + 1) * 86400e3);
+    start.setHours(8 + Math.floor(rnd() * 12), Math.floor(rnd() * 60));
+    const kwh = 2 + rnd() * 45;
+    const summer = Math.abs(start.getMonth() - 6) < 3;
+    const solar = kwh * Math.min(1, rnd() * (summer ? 1.6 : 0.4));
+    const charge_s = (kwh / (3 + rnd() * 8)) * 3600;
+    const socStart = 20 + Math.floor(rnd() * 40);
+    odo -= 40 + rnd() * 120;
+    sessions.push({
+      start: start.toISOString(), end: new Date(+start + charge_s * 1000 + 600e3).toISOString(),
+      energy_wh: kwh * 1000, solar_wh: solar * 1000, grid_wh: (kwh - solar) * 1000, cost_eur: (kwh - solar) * 0.298 + solar * 0.082,
+      max_power_w: 11000, charge_s, soc_start: socStart, soc_end: Math.min(100, socStart + Math.round(kwh / 0.77)),
+      odometer_km: Math.round(odo * 10) / 10, range_start_km: socStart * 4.9, range_end_km: Math.min(100, socStart + kwh / 0.77) * 4.9,
+    });
+  }
+  sessions.push({ start: new Date(now - 2 * 86400e3).toISOString(), end: new Date(now - 2 * 86400e3 + 60e3).toISOString(),
+    energy_wh: 0, solar_wh: 0, grid_wh: 0, cost_eur: 0, charge_s: 0 }); // wird ausgeblendet
+  sessions.sort((a, b) => b.start.localeCompare(a.start));
+
+  const listeners = [];
+  const hass = {
+    get states() { return states; },
+    themes: { darkMode: location.search.includes("dark") },
+    locale: { language: "de" },
+    async callWS(msg) {
+      await new Promise((r) => setTimeout(r, 150));
+      if (msg.type === "pvlader/config") return { entries: [{
+        entry_id: "abc", title: "Garage", entities: ids,
+        sources: { grid_power: "sensor.grid_power", pv_power: "sensor.pv_power", soc: "sensor.tesla_battery_level",
+          odometer: "sensor.tesla_odometer", range: "sensor.tesla_rated_battery_range_km" },
+        grid_price: 0.298, feedin_price: 0.082, battery_kwh: 77, efficiency: 0.9, max_power_w: 11040,
+      }] };
+      if (msg.type === "pvlader/sessions") return {
+        entry_id: "abc", sessions, grid_price: 0.298, feedin_price: 0.082,
+        current: { start: new Date(now - 3600e3).toISOString(), end: null, energy_wh: 3420, solar_wh: 2975, grid_wh: 445,
+          cost_eur: 0.38, charge_s: 3000, soc_start: 38, soc_end: 42, odometer_km: 39479, range_start_km: 188, range_end_km: 207 },
+      };
+      throw new Error("unbekannt");
+    },
+    async callService(domain, service, data) {
+      console.log("callService", domain, service, data);
+      const set = (id, v) => { states = { ...states, [id]: st(v, states[id]?.attributes) }; };
+      if (domain === "select") set(data.entity_id, data.option);
+      if (domain === "number") set(data.entity_id, data.value);
+      if (domain === "switch") set(data.entity_id, service === "turn_on" ? "on" : "off");
+      if (domain === "pvlader") {
+        set(ids.plan_active, "on"); set(ids.plan_target_soc, data.target_soc);
+        set(ids.plan_time, new Date(data.time).toISOString());
+        set(ids.planned_start, new Date(+new Date(data.time) - 3 * 3600e3).toISOString());
+      }
+      listeners.forEach((fn) => fn());
+    },
+  };
+
+  const root = document.getElementById("root");
+  let el;
+  if (location.search.includes("view=card")) {
+    root.className = "cardonly";
+    el = document.createElement("pvlader-card");
+    el.setConfig({ title: "Garage", vehicle_name: "Model Y Domi" });
+  } else {
+    el = document.createElement("pvlader-panel");
+    el.narrow = innerWidth < 870;
+  }
+  el.hass = hass;
+  root.append(el);
+  listeners.push(() => { el.hass = { ...hass, states }; });
+  window.addEventListener("hass-notification", (e) => alert(e.detail.message));
+</script>
+</body>
+</html>

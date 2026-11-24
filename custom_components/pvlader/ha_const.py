@@ -24,12 +24,18 @@ CONF_GRID_POWER: Final = "grid_power"
 CONF_PV_POWER: Final = "pv_power"
 CONF_SOC: Final = "soc"
 CONF_PLUGGED: Final = "plugged"
-ENTITY_KEYS: Final = (CONF_GRID_POWER, CONF_PV_POWER, CONF_SOC, CONF_PLUGGED)
+CONF_ODOMETER: Final = "odometer"
+CONF_RANGE: Final = "range"
+ENTITY_KEYS: Final = (CONF_GRID_POWER, CONF_PV_POWER, CONF_SOC, CONF_PLUGGED, CONF_ODOMETER, CONF_RANGE)
 
 DEFAULT_GRID_POWER: Final = "sensor.bitshake_smartmeterreader_e320_power_in"
 DEFAULT_PV_POWER: Final = "sensor.solar_power_current_power"
 DEFAULT_SOC: Final = "sensor.tesla_battery_level"
 DEFAULT_PLUGGED: Final = "binary_sensor.tesla_plugged_in"
+DEFAULT_ODOMETER: Final = "sensor.tesla_odometer"
+DEFAULT_RANGE: Final = "sensor.tesla_rated_battery_range_km"
+# Für Einträge, die vor Einführung dieser Felder angelegt wurden (fehlender Schlüssel ≠ bewusst leer)
+ENTITY_FALLBACKS: Final[dict[str, str]] = {CONF_ODOMETER: DEFAULT_ODOMETER, CONF_RANGE: DEFAULT_RANGE}
 
 # Options
 CONF_BATTERY_KWH: Final = "battery_kwh"

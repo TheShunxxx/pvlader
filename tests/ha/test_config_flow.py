@@ -46,6 +46,8 @@ async def test_flow_success_read_only(hass: HomeAssistant, wallbox: FakeWallbox)
         "pv_power": None,
         "soc": "sensor.car_soc",
         "plugged": None,
+        "odometer": None,
+        "range": None,
     }
     assert setup.call_count == 1
     # Verbindungstest darf nichts schreiben (evcc läuft parallel)

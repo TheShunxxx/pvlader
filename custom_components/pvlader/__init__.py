@@ -17,7 +17,9 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN
 from .coordinator import PvLaderConfigEntry, PvLaderCoordinator
 from .dadapower import DadapowerClient, WallboxError
+from .frontend import async_register_frontend
 from .ha_const import ATTR_CONFIG_ENTRY_ID, ATTR_TARGET_SOC, ATTR_TIME, CONF_UNIT_ID, SERVICE_SET_PLAN
+from .websocket import async_register_websocket
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -40,7 +42,7 @@ SET_PLAN_SCHEMA = vol.Schema(
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Service einmalig registrieren."""
+    """Service, WebSocket-API und Oberfläche (Karte + Seitenreiter) einmalig registrieren."""
 
     async def _set_plan(call: ServiceCall) -> None:
         coordinator = _coordinator_for(hass, call.data.get(ATTR_CONFIG_ENTRY_ID))
@@ -50,6 +52,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         await coordinator.async_set_plan(call.data[ATTR_TARGET_SOC], when)
 
     hass.services.async_register(DOMAIN, SERVICE_SET_PLAN, _set_plan, schema=SET_PLAN_SCHEMA)
+    async_register_websocket(hass)
+    await async_register_frontend(hass)
     return True
 
 
