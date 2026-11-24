@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from pvlader.controller import Command, ControllerInputs, ControllerState, StatusInfo, step
+from pvlader.controller import Command, ControllerInputs, ControllerState, StatusInfo, power_at, step
 
 T0 = datetime(2026, 11, 23, 8, 0)
 V = 230.0
@@ -532,3 +532,28 @@ def test_plan_deadline_passed_returns_to_normal():
     sim.run(400)
     assert not sim.state.plan_charging
     assert sim.history[-1][2].effective_mode == "pv"
+
+
+# --- Zeitabgleich Netzzähler ------------------------------------------------------
+
+
+def test_power_at_picks_sample_nearest_to_grid_timestamp():
+    s = [(T0, 5.0), (T0 + timedelta(seconds=10), 1634.0), (T0 + timedelta(seconds=20), 3277.0)]
+    assert power_at(s, T0 + timedelta(seconds=3), 0.0) == 5.0
+    assert power_at(s, T0 + timedelta(seconds=13), 0.0) == 1634.0
+    assert power_at(s, T0 + timedelta(seconds=5), 0.0) == 5.0  # Gleichstand -> frühere Probe
+    assert power_at(s, None, 42.0) == 42.0
+    assert power_at([], T0, 42.0) == 42.0
+
+
+def test_start_ramp_with_stale_grid_does_not_overshoot():
+    # Live 2026-11-24 13:19:01: Box zieht schon 1634 W, Zähler (13:18:54) zeigt noch −1578 W
+    # von vor dem Anlauf. Ohne Abgleich: Überschuss 3212 W -> 14 A. Mit Abgleich: ~6,9 A.
+    st = ControllerState(enabled=True, phases=1, current=6.86, mode="pv")
+    cmd, st, info = step(
+        inputs(grid_power_w=-1578, charge_power_w=1634, charge_power_at_grid_w=5, charging=True,
+               active_phases=1, enabled=True, configured_phases=1),
+        st,
+    )
+    assert info.surplus_w == pytest.approx(1583)
+    assert cmd.current is None  # 6,88 A ≈ bisher 6,86 A -> nichts schreiben

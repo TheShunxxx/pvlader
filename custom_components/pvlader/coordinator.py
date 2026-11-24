@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import deque
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
@@ -29,7 +30,7 @@ from .const import (
     MODES,
     POWER_ON_THRESHOLD,
 )
-from .controller import Command, ControllerInputs, ControllerSettings, ControllerState, StatusInfo, step
+from .controller import Command, ControllerInputs, ControllerSettings, ControllerState, StatusInfo, power_at, step
 from .dadapower import DadapowerClient, WallboxError, WallboxInfo, WallboxState
 from .ha_const import (
     CONF_BATTERY_KWH,
@@ -127,6 +128,8 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
         self.settings = UserSettings()
         self.tracker = SessionTracker(grid_price=float(self.conf[CONF_GRID_PRICE]))
         self._ctrl_state = ControllerState()
+        # Ladeleistung der letzten ~60 s, um sie zeitlich zum Netzzähler passend zu wählen
+        self._power_samples: deque[tuple[datetime, float]] = deque(maxlen=7)
         self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}")
         self._save_pending = False
         self._loaded = False
@@ -263,6 +266,10 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
 
         s = self.settings
         grid = self._float(CONF_GRID_POWER, power=True)
+        grid_state = self._state(CONF_GRID_POWER)
+        grid_ts = None if grid_state is None else (getattr(grid_state, "last_reported", None) or grid_state.last_updated)
+        self._power_samples.append((now, wb.power_w))
+        charge_at_grid = power_at(self._power_samples, grid_ts, wb.power_w)
         pv = self._float(CONF_PV_POWER, power=True)
         soc = self._float(CONF_SOC)
         plugged = self._bool(CONF_PLUGGED)
@@ -275,6 +282,7 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
             mode=s.mode,
             grid_power_w=grid,
             charge_power_w=wb.power_w,
+            charge_power_at_grid_w=charge_at_grid,
             plug=wb.plug,
             connected=connected,
             charging=wb.charging,

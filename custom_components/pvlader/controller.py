@@ -8,6 +8,7 @@ Anwendung eines Commands durch den Aufrufer: phases -> current -> enable.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 
@@ -61,6 +62,9 @@ class ControllerInputs:
     # Register 1001 per FC04 in ganzen A. Die Box setzt es beim Abschalten selbst auf 6 A zurück
     # (live beobachtet 2026-11-23) -> Grundlage für den Strom-Resync.
     current_setpoint: float | None = None
+    # Ladeleistung zum Messzeitpunkt des Netzzählers (siehe power_at). Der Zähler liefert nur
+    # alle ~10 s; ohne Abgleich zählt eine gerade geänderte Ladeleistung doppelt oder gar nicht.
+    charge_power_at_grid_w: float | None = None
     limit_soc: float = 100.0
     min_current: float = MIN_CURRENT
     max_current: float = MAX_CURRENT
@@ -118,6 +122,13 @@ class _Decision:
     # Ausdrücklicher Wunsch (Aus, Sofort/Plan, SoC-Limit, kein Fahrzeug): schaltet ohne Guard.
     # Der Guard bremst nur die automatische PV-Regelung (Start/Stopp/Phasen).
     exempt: bool = False
+
+
+def power_at(samples: Sequence[tuple[datetime, float]], when: datetime | None, fallback: float) -> float:
+    """Ladeleistung aus der Probe, die dem Zeitpunkt `when` am nächsten liegt (bei Gleichstand die frühere)."""
+    if when is None or not samples:
+        return fallback
+    return min(samples, key=lambda s: (abs((s[0] - when).total_seconds()), s[0]))[1]
 
 
 def _secs(now: datetime, since: datetime | None) -> float:
@@ -231,7 +242,8 @@ def step(inp: ControllerInputs, state: ControllerState) -> tuple[Command, Contro
     s = inp.settings
     st = replace(state)
     now = inp.now
-    surplus = None if inp.grid_power_w is None else inp.charge_power_w - inp.grid_power_w
+    charge_ref = inp.charge_power_w if inp.charge_power_at_grid_w is None else inp.charge_power_at_grid_w
+    surplus = None if inp.grid_power_w is None else charge_ref - inp.grid_power_w
     measured_on = inp.charging or inp.charge_power_w > s.power_on_threshold
 
     # Unbekannten Zustand (z. B. nach Neustart) aus Messwerten übernehmen
