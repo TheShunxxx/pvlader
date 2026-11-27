@@ -21,6 +21,7 @@
           "grid_power": "Grid power",
           "pv_power": "PV power",
           "soc": "Vehicle state of charge",
+          "car_limit": "Vehicle charge limit",
           "plugged": "Vehicle plugged in",
           "odometer": "Odometer",
           "range": "Range"
@@ -29,6 +30,7 @@
           "grid_power": "Signed grid power in W: positive = import, negative = export.",
           "pv_power": "Optional, display only.",
           "soc": "Battery level of the vehicle in %.",
+          "car_limit": "Optional. Charge limit set in the vehicle in %. The lower of this and the charge limit setting applies.",
           "plugged": "Optional, used only if the wallbox reports an unknown plug state.",
           "odometer": "Optional, used only for the charging history (km).",
           "range": "Optional, used only for the charging history (km)."
@@ -52,6 +54,7 @@
           "grid_power": "Grid power",
           "pv_power": "PV power",
           "soc": "Vehicle state of charge",
+          "car_limit": "Vehicle charge limit",
           "plugged": "Vehicle plugged in",
           "battery_kwh": "Battery capacity",
           "grid_price": "Grid price",
@@ -62,7 +65,8 @@
           "disable_delay": "Disable delay",
           "guard": "Switching guard time",
           "odometer": "Odometer",
-          "range": "Range"
+          "range": "Range",
+          "recharge_delta": "Recharge threshold"
         },
         "data_description": {
           "min_current": "Lower bound for the minimum current setting.",
@@ -71,7 +75,9 @@
           "disable_delay": "PV mode: surplus must be insufficient this long before charging stops.",
           "guard": "Minimum time between enable or phase switching.",
           "odometer": "Optional, used only for the charging history (km).",
-          "range": "Optional, used only for the charging history (km)."
+          "range": "Optional, used only for the charging history (km).",
+          "car_limit": "Optional. Charge limit set in the vehicle in %. The lower of this and the charge limit setting applies.",
+          "recharge_delta": "After the charge limit is reached, charging resumes only once the state of charge has dropped this far below the limit. Lets the vehicle sleep."
         }
       }
     },

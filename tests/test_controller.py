@@ -24,6 +24,7 @@ class Sim:
     plug: str = "B"
     soc: float | None = None
     limit_soc: float = 100.0
+    car_limit_soc: float | None = None
     meter_down: bool = False
     plan_active: bool = False
     plan_target_soc: float | None = None
@@ -63,6 +64,7 @@ class Sim:
             current_setpoint=float(int(self.current)),
             soc=self.soc,
             limit_soc=self.limit_soc,
+            car_limit_soc=self.car_limit_soc,
             plan_active=self.plan_active,
             plan_target_soc=self.plan_target_soc,
             plan_time=self.plan_time,
@@ -373,13 +375,82 @@ def test_soc_limit_with_hysteresis():
     sim.soc = 80.0
     cmd, info = sim.tick()  # sofort, trotz Guard
     assert cmd.enable is False and info.soc_limit_reached
-    assert "SoC-Limit 80 %" in info.reason
-    sim.soc = 78.5
-    sim.run(600)
-    assert not sim.enabled  # innerhalb Hysterese
-    sim.soc = 77.9
+    assert "SoC-Limit 80 % erreicht, Nachladen unter 70 %" in info.reason
+    for soc in (79.0, 75.0, 70.5):  # langsames Absinken im Stand: kein Nachladen
+        sim.soc = soc
+        sim.run(600)
+        assert not sim.enabled
+    sim.soc = 69.9
     sim.tick()
     assert sim.enabled and not sim.state.soc_limit_reached
+
+
+def test_car_limit_below_own_limit_disables_box():
+    """Auto-Limit 80 %, eigenes 100 %: Box muss abschalten, sonst lädt das Auto selbst nach und schläft nie."""
+    sim = Sim(mode="pv", pv=8000, soc=79.0, limit_soc=100.0, car_limit_soc=80.0, battery_kwh=1000)
+    sim.run(300)
+    assert sim.enabled
+    sim.soc = 80.0
+    cmd, info = sim.tick()
+    assert cmd.enable is False and info.soc_limit_reached
+    assert "(Auto)" in info.reason
+    sim.soc = 76.0
+    sim.run(3600)
+    assert not sim.enabled  # trotz PV-Überschuss keine Freigabe, keine Schaltvorgänge
+    assert all(h[1].enable is None for h in sim.history[-360:])
+
+
+def test_car_limit_unavailable_keeps_last_known_value():
+    sim = Sim(mode="now", soc=80.0, limit_soc=100.0, car_limit_soc=80.0)
+    sim.tick()
+    assert not sim.enabled
+    sim.car_limit_soc = None  # TeslaMate kurz ohne Wert
+    sim.soc = 78.0
+    sim.run(600)
+    assert not sim.enabled
+
+
+def test_raising_limit_resumes_charging_immediately():
+    sim = Sim(mode="now", soc=80.0, limit_soc=100.0, car_limit_soc=80.0, battery_kwh=1000)
+    sim.tick()
+    sim.soc = 78.0
+    sim.tick()
+    assert not sim.enabled
+    sim.car_limit_soc = 90.0  # im Auto für eine Fahrt hochgesetzt
+    sim.tick()
+    assert sim.enabled
+
+
+def test_lowering_limit_keeps_box_off():
+    sim = Sim(mode="now", soc=80.0, limit_soc=80.0)
+    sim.tick()
+    sim.limit_soc = 75.0
+    sim.soc = 74.0
+    sim.run(300)
+    assert not sim.enabled
+
+
+def test_unplug_resets_recharge_hysteresis():
+    sim = Sim(mode="now", soc=80.0, limit_soc=80.0)
+    sim.tick()
+    assert not sim.enabled
+    sim.plug = "A"
+    sim.tick()
+    sim.plug = "B"
+    sim.soc = 76.0  # nach kurzer Fahrt wieder angesteckt
+    sim.tick()
+    assert sim.enabled
+
+
+def test_mode_change_resets_recharge_hysteresis():
+    sim = Sim(mode="pv", soc=80.0, limit_soc=80.0)
+    sim.tick()
+    sim.soc = 77.0
+    sim.tick()
+    assert not sim.enabled
+    sim.mode = "now"
+    sim.tick()
+    assert sim.enabled
 
 
 def test_soc_none_is_ignored():

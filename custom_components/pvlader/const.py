@@ -31,7 +31,7 @@ POWER_ON_THRESHOLD: Final = 100.0  # W, ab hier gilt "Auto zieht Strom"
 BATTERY_KWH: Final = 77.0
 EFFICIENCY: Final = 0.9
 PLAN_BUFFER: Final = timedelta(minutes=15)
-SOC_HYSTERESIS: Final = 2.0  # Prozentpunkte
+SOC_HYSTERESIS: Final = 10.0  # Prozentpunkte: erst so weit unter dem Limit wird nachgeladen
 
 # Preise (EUR/kWh)
 GRID_PRICE: Final = 0.298

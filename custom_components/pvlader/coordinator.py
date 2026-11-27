@@ -34,6 +34,7 @@ from .controller import Command, ControllerInputs, ControllerSettings, Controlle
 from .dadapower import DadapowerClient, WallboxError, WallboxInfo, WallboxState
 from .ha_const import (
     CONF_BATTERY_KWH,
+    CONF_CAR_LIMIT,
     CONF_DISABLE_DELAY,
     CONF_ENABLE_DELAY,
     CONF_FEEDIN_PRICE,
@@ -46,6 +47,7 @@ from .ha_const import (
     CONF_PLUGGED,
     CONF_PV_POWER,
     CONF_RANGE,
+    CONF_RECHARGE_DELTA,
     CONF_SOC,
     ENTITY_FALLBACKS,
     OPTION_DEFAULTS,
@@ -151,6 +153,7 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
         stored = await self._store.async_load() or {}
         history = await self._history_store.async_load()
         self.settings = UserSettings.from_dict(stored.get("settings"))
+        self._ctrl_state = self._restore_limit_state(ControllerState(), stored.get("limit"))
         sessions = dict(stored.get("sessions") or {})
         if history is not None:
             sessions["history"] = history.get("sessions", [])
@@ -180,7 +183,21 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
     @callback
     def _data_to_save(self) -> dict[str, Any]:
         self._save_pending = False
-        return {"settings": self.settings.to_dict(), "sessions": self.tracker.to_dict(include_history=False)}
+        st = self._ctrl_state
+        return {
+            "settings": self.settings.to_dict(),
+            "sessions": self.tracker.to_dict(include_history=False),
+            # Nachlade-Hysterese über Neustarts halten, sonst lädt das Auto danach für 1 % nach
+            "limit": {"reached": st.soc_limit_reached, "soc_limit": st.soc_limit, "car_limit": st.car_limit_soc},
+        }
+
+    @staticmethod
+    def _restore_limit_state(state: ControllerState, data: dict[str, Any] | None) -> ControllerState:
+        data = data or {}
+        state.soc_limit_reached = bool(data.get("reached", False))
+        state.soc_limit = data.get("soc_limit")
+        state.car_limit_soc = data.get("car_limit")
+        return state
 
     async def async_save_history(self) -> None:
         await self._history_store.async_save(
@@ -246,7 +263,10 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
                 except WallboxError as err:
                     self.client.read_only = True
                     raise HomeAssistantError(f"Wallbox nicht erreichbar: {err}") from err
-                self._ctrl_state = ControllerState()
+                old = self._ctrl_state
+                self._ctrl_state = ControllerState(
+                    soc_limit_reached=old.soc_limit_reached, soc_limit=old.soc_limit, car_limit_soc=old.car_limit_soc
+                )
                 _LOGGER.info("Steuerung aktiviert – pvlader schreibt jetzt auf die Wallbox")
             else:
                 self.client.read_only = True
@@ -322,6 +342,7 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
             enabled=wb.enabled,
             soc=soc,
             limit_soc=s.limit_soc,
+            car_limit_soc=self._float(CONF_CAR_LIMIT),
             min_current=min_c,
             max_current=max_c,
             plan_active=s.plan_active,
@@ -332,6 +353,7 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
                 enable_delay=float(self.conf[CONF_ENABLE_DELAY]),
                 disable_delay=float(self.conf[CONF_DISABLE_DELAY]),
                 guard=float(self.conf[CONF_GUARD]),
+                soc_hysteresis=float(self.conf[CONF_RECHARGE_DELTA]),
             ),
         )
         prev_state = self._ctrl_state
@@ -343,7 +365,13 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
                 await self._async_apply(cmd)
             except WallboxError as err:
                 # Zustand aus Messwerten neu aufbauen, Schaltsperre behalten
-                self._ctrl_state = ControllerState(last_switch=self._ctrl_state.last_switch)
+                old = self._ctrl_state
+                self._ctrl_state = ControllerState(
+                    last_switch=old.last_switch,
+                    soc_limit_reached=old.soc_limit_reached,
+                    soc_limit=old.soc_limit,
+                    car_limit_soc=old.car_limit_soc,
+                )
                 raise UpdateFailed(f"Schreiben fehlgeschlagen: {err}") from err
 
         # Session: endet beim Abstecken bzw. bei Modus Aus unter eigener Steuerung
@@ -393,6 +421,8 @@ class PvLaderCoordinator(DataUpdateCoordinator[PvLaderData]):
             return None
         s = self.settings
         target = s.plan_target_soc if plan_charging else s.limit_soc
+        if self._ctrl_state.car_limit_soc is not None:
+            target = min(target, self._ctrl_state.car_limit_soc)
         if target <= soc:
             return 0.0
         kwh = (target - soc) / 100.0 * float(self.conf[CONF_BATTERY_KWH]) / EFFICIENCY

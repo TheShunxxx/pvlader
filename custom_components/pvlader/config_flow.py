@@ -23,6 +23,7 @@ from .const import DEFAULT_PORT, DEFAULT_UNIT_ID, DOMAIN, MAX_CURRENT, MIN_CURRE
 from .dadapower import DadapowerClient, WallboxError, WallboxInfo
 from .ha_const import (
     CONF_BATTERY_KWH,
+    CONF_CAR_LIMIT,
     CONF_DISABLE_DELAY,
     CONF_ENABLE_DELAY,
     CONF_FEEDIN_PRICE,
@@ -35,8 +36,10 @@ from .ha_const import (
     CONF_PLUGGED,
     CONF_PV_POWER,
     CONF_RANGE,
+    CONF_RECHARGE_DELTA,
     CONF_SOC,
     CONF_UNIT_ID,
+    DEFAULT_CAR_LIMIT,
     DEFAULT_GRID_POWER,
     DEFAULT_HOST,
     DEFAULT_ODOMETER,
@@ -55,6 +58,7 @@ ENTITY_DEFAULTS = {
     CONF_GRID_POWER: DEFAULT_GRID_POWER,
     CONF_PV_POWER: DEFAULT_PV_POWER,
     CONF_SOC: DEFAULT_SOC,
+    CONF_CAR_LIMIT: DEFAULT_CAR_LIMIT,
     CONF_PLUGGED: DEFAULT_PLUGGED,
     CONF_ODOMETER: DEFAULT_ODOMETER,
     CONF_RANGE: DEFAULT_RANGE,
@@ -86,6 +90,8 @@ def _entities_schema(values: dict[str, Any]) -> vol.Schema:
             vol.Required(CONF_GRID_POWER, default=values.get(CONF_GRID_POWER) or DEFAULT_GRID_POWER): sensor,
             vol.Optional(CONF_PV_POWER, description={"suggested_value": values.get(CONF_PV_POWER)}): sensor,
             vol.Required(CONF_SOC, default=values.get(CONF_SOC) or DEFAULT_SOC): sensor,
+            # Ladelimit im Auto: das niedrigere Limit gewinnt
+            vol.Optional(CONF_CAR_LIMIT, description={"suggested_value": values.get(CONF_CAR_LIMIT)}): sensor,
             vol.Optional(CONF_PLUGGED, description={"suggested_value": values.get(CONF_PLUGGED)}): EntitySelector(
                 EntitySelectorConfig(domain="binary_sensor")
             ),
@@ -146,6 +152,7 @@ class PvLaderConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(title="PV-Lader", data=data)
         suggested = {
             CONF_PV_POWER: DEFAULT_PV_POWER,
+            CONF_CAR_LIMIT: DEFAULT_CAR_LIMIT,
             CONF_PLUGGED: DEFAULT_PLUGGED,
             CONF_ODOMETER: DEFAULT_ODOMETER,
             CONF_RANGE: DEFAULT_RANGE,
@@ -193,6 +200,7 @@ class PvLaderOptionsFlow(OptionsFlow):
                 vol.Required(CONF_ENABLE_DELAY, default=current[CONF_ENABLE_DELAY]): _num(0, 3600, 1, "s"),
                 vol.Required(CONF_DISABLE_DELAY, default=current[CONF_DISABLE_DELAY]): _num(0, 3600, 1, "s"),
                 vol.Required(CONF_GUARD, default=current[CONF_GUARD]): _num(0, 3600, 1, "s"),
+                vol.Required(CONF_RECHARGE_DELTA, default=current[CONF_RECHARGE_DELTA]): _num(1, 50, 1, "%"),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema, errors=errors)

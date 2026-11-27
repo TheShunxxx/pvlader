@@ -66,6 +66,9 @@ class ControllerInputs:
     # alle ~10 s; ohne Abgleich zählt eine gerade geänderte Ladeleistung doppelt oder gar nicht.
     charge_power_at_grid_w: float | None = None
     limit_soc: float = 100.0
+    # Ladelimit im Auto (TeslaMate). Das niedrigere Limit gewinnt – sonst hält die Box
+    # die Freigabe, das Auto lädt bei jedem kleinen Abfall selbst nach und schläft nie.
+    car_limit_soc: float | None = None
     min_current: float = MIN_CURRENT
     max_current: float = MAX_CURRENT
     plan_active: bool = False
@@ -86,6 +89,10 @@ class ControllerState:
     current: float | None = None  # zuletzt kommandierter Strom
     enabled: bool | None = None  # zuletzt kommandierter Freigabezustand (None = unbekannt)
     soc_limit_reached: bool = False
+    soc_limit: float | None = None  # Limit, bei dem soc_limit_reached gesetzt wurde
+    # Zuletzt bekanntes Auto-Limit: fällt der Sensor kurz aus, darf das Limit nicht auf das
+    # eigene (höhere) springen – das würde die Box freigeben und das Auto wecken.
+    car_limit_soc: float | None = None
     plan_charging: bool = False  # Planladen läuft (verriegelt bis Ziel/Zielzeit)
     mode: str | None = None  # zuletzt gesehener Modus – Moduswechsel hebt die Schaltsperre auf
 
@@ -257,6 +264,7 @@ def step(inp: ControllerInputs, state: ControllerState) -> tuple[Command, Contro
     # Moduswechsel durch den Nutzer: frühere Schaltvorgänge sperren nichts mehr
     if st.mode is not None and st.mode != inp.mode:
         st.last_switch = None
+        st.soc_limit_reached = False  # Nutzerwunsch: Nachlade-Hysterese gilt nicht mehr
     st.mode = inp.mode
 
     planned_start: datetime | None = None
@@ -271,21 +279,40 @@ def step(inp: ControllerInputs, state: ControllerState) -> tuple[Command, Contro
         _reset_timers(st)
         st.plan_charging = False
         st.last_switch = None  # neues Fahrzeug -> kein Guard aus alter Session
+        st.soc_limit_reached = False  # nach dem Abstecken normal bis zum Limit laden
+        st.soc_limit = None
         dec = _Decision(False, "Kein Fahrzeug", exempt=True)
     else:
         planned_start = _update_plan(inp, st)
         if st.plan_charging:
             effective_mode = MODE_NOW
         limit = inp.plan_target_soc if st.plan_charging and inp.plan_target_soc is not None else inp.limit_soc
+        if inp.car_limit_soc is not None:
+            st.car_limit_soc = inp.car_limit_soc
+        car_limited = st.car_limit_soc is not None and st.car_limit_soc < limit
+        if car_limited:
+            assert st.car_limit_soc is not None
+            limit = st.car_limit_soc
         if inp.soc is not None:
+            # Limit angehoben (Nutzer oder Auto): sofort bis zum neuen Limit laden
+            if st.soc_limit_reached and st.soc_limit is not None and limit > st.soc_limit and inp.soc < limit:
+                st.soc_limit_reached = False
             if inp.soc >= limit:
                 st.soc_limit_reached = True
+                st.soc_limit = limit
             elif inp.soc < limit - s.soc_hysteresis:
                 st.soc_limit_reached = False
+            elif st.soc_limit_reached:
+                st.soc_limit = limit
 
         if inp.soc is not None and st.soc_limit_reached:
             _reset_timers(st)
-            dec = _Decision(False, f"SoC-Limit {limit:.0f} % erreicht", exempt=True)
+            source = " (Auto)" if car_limited else ""
+            dec = _Decision(
+                False,
+                f"SoC-Limit {limit:.0f} %{source} erreicht, Nachladen unter {limit - s.soc_hysteresis:.0f} %",
+                exempt=True,
+            )
         elif effective_mode == MODE_NOW:
             _reset_timers(st)
             reason = "Sofortladen"

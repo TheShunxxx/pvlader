@@ -45,6 +45,7 @@ async def test_flow_success_read_only(hass: HomeAssistant, wallbox: FakeWallbox)
         "grid_power": "sensor.grid_power",
         "pv_power": None,
         "soc": "sensor.car_soc",
+        "car_limit": None,
         "plugged": None,
         "odometer": None,
         "range": None,

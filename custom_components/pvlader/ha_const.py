@@ -13,6 +13,7 @@ from .const import (
     GUARD,
     MAX_CURRENT,
     MIN_CURRENT,
+    SOC_HYSTERESIS,
 )
 
 # Config-Entry (data)
@@ -26,7 +27,16 @@ CONF_SOC: Final = "soc"
 CONF_PLUGGED: Final = "plugged"
 CONF_ODOMETER: Final = "odometer"
 CONF_RANGE: Final = "range"
-ENTITY_KEYS: Final = (CONF_GRID_POWER, CONF_PV_POWER, CONF_SOC, CONF_PLUGGED, CONF_ODOMETER, CONF_RANGE)
+CONF_CAR_LIMIT: Final = "car_limit"
+ENTITY_KEYS: Final = (
+    CONF_GRID_POWER,
+    CONF_PV_POWER,
+    CONF_SOC,
+    CONF_CAR_LIMIT,
+    CONF_PLUGGED,
+    CONF_ODOMETER,
+    CONF_RANGE,
+)
 
 DEFAULT_GRID_POWER: Final = "sensor.bitshake_smartmeterreader_e320_power_in"
 DEFAULT_PV_POWER: Final = "sensor.solar_power_current_power"
@@ -34,8 +44,13 @@ DEFAULT_SOC: Final = "sensor.tesla_battery_level"
 DEFAULT_PLUGGED: Final = "binary_sensor.tesla_plugged_in"
 DEFAULT_ODOMETER: Final = "sensor.tesla_odometer"
 DEFAULT_RANGE: Final = "sensor.tesla_rated_battery_range_km"
+DEFAULT_CAR_LIMIT: Final = "sensor.tesla_charge_limit_soc"
 # Für Einträge, die vor Einführung dieser Felder angelegt wurden (fehlender Schlüssel ≠ bewusst leer)
-ENTITY_FALLBACKS: Final[dict[str, str]] = {CONF_ODOMETER: DEFAULT_ODOMETER, CONF_RANGE: DEFAULT_RANGE}
+ENTITY_FALLBACKS: Final[dict[str, str]] = {
+    CONF_ODOMETER: DEFAULT_ODOMETER,
+    CONF_RANGE: DEFAULT_RANGE,
+    CONF_CAR_LIMIT: DEFAULT_CAR_LIMIT,
+}
 
 # Options
 CONF_BATTERY_KWH: Final = "battery_kwh"
@@ -46,6 +61,7 @@ CONF_MAX_CURRENT: Final = "max_current"
 CONF_ENABLE_DELAY: Final = "enable_delay"
 CONF_DISABLE_DELAY: Final = "disable_delay"
 CONF_GUARD: Final = "guard"
+CONF_RECHARGE_DELTA: Final = "recharge_delta"
 
 OPTION_DEFAULTS: Final[dict[str, float]] = {
     CONF_BATTERY_KWH: BATTERY_KWH,
@@ -56,6 +72,7 @@ OPTION_DEFAULTS: Final[dict[str, float]] = {
     CONF_ENABLE_DELAY: ENABLE_DELAY,
     CONF_DISABLE_DELAY: DISABLE_DELAY,
     CONF_GUARD: GUARD,
+    CONF_RECHARGE_DELTA: SOC_HYSTERESIS,
 }
 
 # Persistenz

@@ -21,6 +21,7 @@
           "grid_power": "Netzleistung",
           "pv_power": "PV-Leistung",
           "soc": "Ladestand Fahrzeug",
+          "car_limit": "Ladelimit im Fahrzeug",
           "plugged": "Fahrzeug eingesteckt",
           "odometer": "Kilometerstand",
           "range": "Reichweite"
@@ -29,6 +30,7 @@
           "grid_power": "Vorzeichenbehaftete Netzleistung in W: positiv = Bezug, negativ = Einspeisung.",
           "pv_power": "Optional, nur zur Anzeige.",
           "soc": "Akkustand des Fahrzeugs in %.",
+          "car_limit": "Optional. Im Auto eingestelltes Ladelimit in %. Es gilt das niedrigere von diesem und der Ladegrenze.",
           "plugged": "Optional, wird nur genutzt, wenn die Wallbox einen unbekannten Steckerstatus meldet.",
           "odometer": "Optional, nur für die Ladehistorie (km).",
           "range": "Optional, nur für die Ladehistorie (km)."
@@ -52,6 +54,7 @@
           "grid_power": "Netzleistung",
           "pv_power": "PV-Leistung",
           "soc": "Ladestand Fahrzeug",
+          "car_limit": "Ladelimit im Fahrzeug",
           "plugged": "Fahrzeug eingesteckt",
           "battery_kwh": "Akkukapazität",
           "grid_price": "Strompreis Netz",
@@ -62,7 +65,8 @@
           "disable_delay": "Deaktivierungsverzögerung",
           "guard": "Schaltsperre",
           "odometer": "Kilometerstand",
-          "range": "Reichweite"
+          "range": "Reichweite",
+          "recharge_delta": "Nachlade-Schwelle"
         },
         "data_description": {
           "min_current": "Untergrenze für die Einstellung Mindeststrom.",
@@ -71,7 +75,9 @@
           "disable_delay": "Modus Nur PV: so lange muss der Überschuss fehlen, bevor das Laden stoppt.",
           "guard": "Mindestabstand zwischen Ein-/Ausschalten bzw. Phasenumschaltung.",
           "odometer": "Optional, nur für die Ladehistorie (km).",
-          "range": "Optional, nur für die Ladehistorie (km)."
+          "range": "Optional, nur für die Ladehistorie (km).",
+          "car_limit": "Optional. Im Auto eingestelltes Ladelimit in %. Es gilt das niedrigere von diesem und der Ladegrenze.",
+          "recharge_delta": "Nach Erreichen des Limits wird erst wieder geladen, wenn der Ladestand so weit darunter gefallen ist. So kann das Auto schlafen."
         }
       }
     },
